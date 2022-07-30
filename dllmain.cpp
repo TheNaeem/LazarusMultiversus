@@ -1,7 +1,14 @@
 #include "pch.h"
 
 #include "finder.h"
+#include <iostream>
 #include <detours.h>
+
+#define DETOUR(original, hook)\
+	DetourTransactionBegin();\
+	DetourUpdateThread(GetCurrentThread());\
+	DetourAttach(&(PVOID&)original, hook);\
+	DetourTransactionCommit();\
 
 typedef unsigned int (*_PollStatus)(__int64 a1, int a2, char a3, char a4);
 typedef void* (*_GetClientInterface)(__int64 a1);
@@ -18,10 +25,6 @@ inline void* GetClientInterfaceDetour(__int64 a1)
 
 void WINAPI Main()
 {
-	AllocConsole();
-	FILE* f;
-	freopen_s(&f, "CONOUT$", "w", stdout);
-
 	auto PollStatusAddr =
 		GetProcAddress(
 			GetModuleHandle(L"EOSSDK-Win64-Shipping.dll"),
@@ -29,14 +32,7 @@ void WINAPI Main()
 
 	_PollStatus PollStatus = (_PollStatus)PollStatusAddr;
 
-	DetourTransactionBegin();
-	DetourUpdateThread(GetCurrentThread());
-	DetourAttach(&(PVOID&)PollStatus, PollStatusDetour);
-
-	if (DetourTransactionCommit() != NO_ERROR)
-	{
-		MessageBoxA(0, "Failed to detour PollStatus.", "MultiversusDataminer", MB_OK);
-	}
+	DETOUR(PollStatus, PollStatusDetour);
 
 	auto GetClientInterfaceAddr =
 		GetProcAddress(
@@ -45,14 +41,7 @@ void WINAPI Main()
 
 	auto GetClientInterface = (_GetClientInterface)GetClientInterfaceAddr;
 
-	DetourTransactionBegin();
-	DetourUpdateThread(GetCurrentThread());
-	DetourAttach(&(PVOID&)GetClientInterface, GetClientInterfaceDetour);
-
-	if (DetourTransactionCommit() != NO_ERROR)
-	{
-		MessageBoxA(0, "Failed to detour GetClientInterface.", "MultiversusDataminer", MB_OK);
-	}
+	DETOUR(GetClientInterface, GetClientInterfaceDetour);
 }
 
 BOOL APIENTRY DllMain(
